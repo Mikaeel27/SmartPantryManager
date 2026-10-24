@@ -31,6 +31,10 @@ public class PantryActivity extends AppCompatActivity {
 
     private PantryAdapter adapter;
 
+    private static final String[] UNITS = {
+            "kg", "g", "L", "ml", "pieces", "packets"
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -38,14 +42,15 @@ public class PantryActivity extends AppCompatActivity {
 
         databaseHelper = new PantryDatabaseHelper(this);
 
-        listPantryIngredients = findViewById(R.id.listPantryIngredients);
+        listPantryIngredients =
+                findViewById(R.id.listPantryIngredients);
         textEmptyPantry = findViewById(R.id.textEmptyPantry);
         textPantrySubtitle = findViewById(R.id.textPantrySubtitle);
 
-        Button btnAddIngredient = findViewById(R.id.btnPantryAddIngredient);
+        Button btnAddIngredient =
+                findViewById(R.id.btnPantryAddIngredient);
         Button btnBack = findViewById(R.id.btnPantryBack);
 
-        // Use the custom PantryAdapter.
         adapter = new PantryAdapter(this, ingredientList);
         listPantryIngredients.setAdapter(adapter);
 
@@ -59,12 +64,10 @@ public class PantryActivity extends AppCompatActivity {
 
         btnBack.setOnClickListener(view -> finish());
 
-        // Tap an ingredient to edit it.
         listPantryIngredients.setOnItemClickListener(
                 (parent, view, position, id) -> showEditDialog(position)
         );
 
-        // Long-press an ingredient to delete it.
         listPantryIngredients.setOnItemLongClickListener(
                 (parent, view, position, id) -> {
                     confirmDelete(position);
@@ -84,20 +87,16 @@ public class PantryActivity extends AppCompatActivity {
         ingredientIds.clear();
 
         try (Cursor cursor = databaseHelper.getAllIngredients()) {
-
             if (cursor != null) {
                 int idIndex = cursor.getColumnIndexOrThrow(
                         PantryDatabaseHelper.COLUMN_ID
                 );
-
                 int nameIndex = cursor.getColumnIndexOrThrow(
                         PantryDatabaseHelper.COLUMN_NAME
                 );
-
                 int quantityIndex = cursor.getColumnIndexOrThrow(
                         PantryDatabaseHelper.COLUMN_QUANTITY
                 );
-
                 int unitIndex = cursor.getColumnIndexOrThrow(
                         PantryDatabaseHelper.COLUMN_UNIT
                 );
@@ -109,32 +108,42 @@ public class PantryActivity extends AppCompatActivity {
                     String unit = cursor.getString(unitIndex);
 
                     ingredientIds.add(ingredientId);
-
                     ingredientList.add(
                             name + "\nQuantity: " + quantity + " " + unit
                     );
                 }
             }
+        } catch (Exception e) {
+            Toast.makeText(
+                    this,
+                    "Could not load pantry ingredients.",
+                    Toast.LENGTH_LONG
+            ).show();
         }
 
-        adapter.notifyDataSetChanged();
+        if (adapter != null) {
+            adapter.notifyDataSetChanged();
+        }
 
         boolean isEmpty = ingredientList.isEmpty();
 
         listPantryIngredients.setVisibility(
                 isEmpty ? View.GONE : View.VISIBLE
         );
-
         textEmptyPantry.setVisibility(
                 isEmpty ? View.VISIBLE : View.GONE
         );
-
         textPantrySubtitle.setText(
                 ingredientList.size() + " ingredient(s) saved"
         );
     }
 
     private void showEditDialog(int position) {
+        if (!isValidPosition(position)) {
+            loadIngredients();
+            return;
+        }
+
         int ingredientId = ingredientIds.get(position);
 
         try (Cursor cursor = databaseHelper.getReadableDatabase().query(
@@ -146,14 +155,12 @@ public class PantryActivity extends AppCompatActivity {
                 null,
                 null
         )) {
-
             if (cursor == null || !cursor.moveToFirst()) {
                 Toast.makeText(
                         this,
                         "Ingredient not found.",
                         Toast.LENGTH_SHORT
                 ).show();
-
                 loadIngredients();
                 return;
             }
@@ -178,6 +185,7 @@ public class PantryActivity extends AppCompatActivity {
 
             EditText nameInput = new EditText(this);
             nameInput.setHint("Ingredient name");
+            nameInput.setSingleLine(true);
             nameInput.setText(currentName);
 
             EditText quantityInput = new EditText(this);
@@ -185,19 +193,16 @@ public class PantryActivity extends AppCompatActivity {
             quantityInput.setInputType(
                     InputType.TYPE_CLASS_NUMBER
                             | InputType.TYPE_NUMBER_FLAG_DECIMAL
+                            | InputType.TYPE_NUMBER_FLAG_SIGNED
             );
             quantityInput.setText(String.valueOf(currentQuantity));
 
             Spinner unitSpinner = new Spinner(this);
 
-            String[] units = {
-                    "kg", "g", "L", "ml", "pieces", "packets"
-            };
-
             ArrayAdapter<String> unitAdapter = new ArrayAdapter<>(
                     this,
                     android.R.layout.simple_spinner_item,
-                    units
+                    UNITS
             );
 
             unitAdapter.setDropDownViewResource(
@@ -206,8 +211,8 @@ public class PantryActivity extends AppCompatActivity {
 
             unitSpinner.setAdapter(unitAdapter);
 
-            for (int i = 0; i < units.length; i++) {
-                if (units[i].equals(currentUnit)) {
+            for (int i = 0; i < UNITS.length; i++) {
+                if (UNITS[i].equals(currentUnit)) {
                     unitSpinner.setSelection(i);
                     break;
                 }
@@ -225,73 +230,118 @@ public class PantryActivity extends AppCompatActivity {
             layout.addView(quantityInput);
             layout.addView(unitSpinner);
 
-            new AlertDialog.Builder(this)
+            AlertDialog editDialog = new AlertDialog.Builder(this)
                     .setTitle("Edit Ingredient")
                     .setView(layout)
                     .setNegativeButton("Cancel", null)
-                    .setPositiveButton("Save", (dialog, which) -> {
+                    .setPositiveButton("Save", null)
+                    .create();
 
-                        String newName = nameInput.getText()
-                                .toString().trim();
+            editDialog.setOnShowListener(dialog -> {
+                Button saveButton = editDialog.getButton(
+                        AlertDialog.BUTTON_POSITIVE
+                );
 
-                        String quantityText = quantityInput.getText()
-                                .toString().trim();
+                saveButton.setOnClickListener(view -> {
+                    String newName = nameInput.getText()
+                            .toString().trim();
 
-                        if (newName.isEmpty() || quantityText.isEmpty()) {
-                            Toast.makeText(
-                                    this,
-                                    "Enter a name and quantity.",
-                                    Toast.LENGTH_SHORT
-                            ).show();
-                            return;
-                        }
+                    String quantityText = quantityInput.getText()
+                            .toString().trim();
 
-                        try {
-                            double newQuantity = Double.parseDouble(
-                                    quantityText
-                            );
+                    if (newName.isEmpty()) {
+                        nameInput.setError(
+                                "Enter an ingredient name"
+                        );
+                        nameInput.requestFocus();
+                        return;
+                    }
 
-                            if (!Double.isFinite(newQuantity)
-                                    || newQuantity <= 0) {
+                    if (quantityText.isEmpty()) {
+                        quantityInput.setError("Enter a quantity");
+                        quantityInput.requestFocus();
+                        return;
+                    }
 
-                                Toast.makeText(
-                                        this,
-                                        "Quantity must be greater than zero.",
-                                        Toast.LENGTH_SHORT
-                                ).show();
-                                return;
-                            }
+                    final double newQuantity;
 
-                            boolean updated = databaseHelper.updateIngredient(
-                                    ingredientId,
-                                    newName,
-                                    newQuantity,
-                                    unitSpinner.getSelectedItem().toString()
-                            );
+                    try {
+                        newQuantity = Double.parseDouble(quantityText);
+                    } catch (NumberFormatException e) {
+                        quantityInput.setError(
+                                "Enter a valid quantity"
+                        );
+                        quantityInput.requestFocus();
+                        return;
+                    }
 
-                            Toast.makeText(
-                                    this,
-                                    updated
-                                            ? "Ingredient updated."
-                                            : "No changes were saved.",
-                                    Toast.LENGTH_SHORT
-                            ).show();
+                    if (!Double.isFinite(newQuantity)
+                            || newQuantity <= 0) {
+                        quantityInput.setError(
+                                "Quantity must be greater than zero"
+                        );
+                        quantityInput.requestFocus();
+                        return;
+                    }
 
-                            loadIngredients();
+                    if (unitSpinner.getSelectedItem() == null) {
+                        Toast.makeText(
+                                this,
+                                "Please select a measurement unit.",
+                                Toast.LENGTH_SHORT
+                        ).show();
+                        return;
+                    }
 
-                        } catch (NumberFormatException e) {
-                            Toast.makeText(
-                                    this,
-                                    "Enter a valid quantity.",
-                                    Toast.LENGTH_SHORT
-                            ).show();
-                        }
-                    })
-                    .show();
+                    boolean updated;
+
+                    try {
+                        updated = databaseHelper.updateIngredient(
+                                ingredientId,
+                                newName,
+                                newQuantity,
+                                unitSpinner.getSelectedItem().toString()
+                        );
+                    } catch (Exception e) {
+                        updated = false;
+                    }
+
+                    if (updated) {
+                        Toast.makeText(
+                                this,
+                                "Ingredient updated successfully.",
+                                Toast.LENGTH_SHORT
+                        ).show();
+
+                        editDialog.dismiss();
+                        loadIngredients();
+                    } else {
+                        Toast.makeText(
+                                this,
+                                "Could not update ingredient. Please try again.",
+                                Toast.LENGTH_LONG
+                        ).show();
+                    }
+                });
+            });
+
+            editDialog.show();
+
+        } catch (Exception e) {
+            Toast.makeText(
+                    this,
+                    "Could not open ingredient for editing.",
+                    Toast.LENGTH_LONG
+            ).show();
         }
     }
 
     private void confirmDelete(int position) {
+        if (!isValidPosition(position)) {
+            loadIngredients();
+            return;
+        }
+
         int ingredientId = ingredientIds.get(position);
         String ingredient = ingredientList.get(position);
 
@@ -303,10 +353,15 @@ public class PantryActivity extends AppCompatActivity {
                 )
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Delete", (dialog, which) -> {
+                    boolean deleted;
 
-                    boolean deleted = databaseHelper.deleteIngredient(
-                            ingredientId
-                    );
+                    try {
+                        deleted = databaseHelper.deleteIngredient(
+                                ingredientId
+                        );
+                    } catch (Exception e) {
+                        deleted = false;
+                    }
 
                     Toast.makeText(
                             this,
@@ -321,12 +376,18 @@ public class PantryActivity extends AppCompatActivity {
                 .show();
     }
 
+    private boolean isValidPosition(int position) {
+        return position >= 0
+                && position < ingredientIds.size()
+                && position < ingredientList.size();
+    }
+
     @Override
     protected void onDestroy() {
-        super.onDestroy();
-
         if (databaseHelper != null) {
             databaseHelper.close();
         }
+
+        super.onDestroy();
     }
 }
