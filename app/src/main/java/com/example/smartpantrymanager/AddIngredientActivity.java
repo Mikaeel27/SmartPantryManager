@@ -22,18 +22,19 @@ public class AddIngredientActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_add_ingredient);
 
-        // Connect the screen to the database
         databaseHelper = new PantryDatabaseHelper(this);
 
-        // Find the screen components
         editIngredientName = findViewById(R.id.editIngredientName);
-        editIngredientQuantity = findViewById(R.id.editIngredientQuantity);
-        spinnerIngredientUnit = findViewById(R.id.spinnerIngredientUnit);
+        editIngredientQuantity =
+                findViewById(R.id.editIngredientQuantity);
+        spinnerIngredientUnit =
+                findViewById(R.id.spinnerIngredientUnit);
 
-        Button btnSaveIngredient = findViewById(R.id.btnSaveIngredient);
-        Button btnCancelIngredient = findViewById(R.id.btnCancelIngredient);
+        Button btnSaveIngredient =
+                findViewById(R.id.btnSaveIngredient);
+        Button btnCancelIngredient =
+                findViewById(R.id.btnCancelIngredient);
 
-        // Available measurement units
         String[] units = {"kg", "g", "L", "ml", "pieces", "packets"};
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(
@@ -48,42 +49,51 @@ public class AddIngredientActivity extends AppCompatActivity {
 
         spinnerIngredientUnit.setAdapter(adapter);
 
-        // Save the ingredient to SQLite
         btnSaveIngredient.setOnClickListener(v -> saveIngredient());
 
-        // Return to the previous screen
         btnCancelIngredient.setOnClickListener(v -> finish());
     }
 
     private void saveIngredient() {
-        String name = editIngredientName.getText().toString().trim();
-        String quantityText =
-                editIngredientQuantity.getText().toString().trim();
+        String name = editIngredientName.getText()
+                .toString()
+                .trim();
 
-        // Validate the ingredient name
+        String quantityText = editIngredientQuantity.getText()
+                .toString()
+                .trim();
+
+        // Validate ingredient name.
         if (name.isEmpty()) {
-            editIngredientName.setError("Enter an ingredient name");
+            editIngredientName.setError(
+                    "Enter an ingredient name"
+            );
             editIngredientName.requestFocus();
             return;
         }
 
-        // Validate the quantity
+        // Validate quantity input.
         if (quantityText.isEmpty()) {
-            editIngredientQuantity.setError("Enter a quantity");
+            editIngredientQuantity.setError(
+                    "Enter a quantity"
+            );
             editIngredientQuantity.requestFocus();
             return;
         }
 
-        double quantity;
+        final double quantity;
 
         try {
             quantity = Double.parseDouble(quantityText);
         } catch (NumberFormatException e) {
-            editIngredientQuantity.setError("Enter a valid quantity");
+            editIngredientQuantity.setError(
+                    "Enter a valid number, e.g. 2 or 0.5"
+            );
             editIngredientQuantity.requestFocus();
             return;
         }
 
+        // Reject zero, negative and non-finite quantities.
         if (!Double.isFinite(quantity) || quantity <= 0) {
             editIngredientQuantity.setError(
                     "Quantity must be greater than zero"
@@ -92,9 +102,20 @@ public class AddIngredientActivity extends AppCompatActivity {
             return;
         }
 
-        String unit = spinnerIngredientUnit.getSelectedItem().toString();
+        if (spinnerIngredientUnit.getSelectedItem() == null) {
+            Toast.makeText(
+                    this,
+                    "Please select a measurement unit.",
+                    Toast.LENGTH_SHORT
+            ).show();
+            return;
+        }
 
-        // Insert the ingredient into the database
+        String unit = spinnerIngredientUnit
+                .getSelectedItem()
+                .toString();
+
+        // Save the ingredient in SQLite.
         boolean success = databaseHelper.addIngredient(
                 name,
                 quantity,
@@ -108,7 +129,7 @@ public class AddIngredientActivity extends AppCompatActivity {
                     Toast.LENGTH_SHORT
             ).show();
 
-            // Clear the form after saving
+            // Clear the form after a successful save.
             editIngredientName.setText("");
             editIngredientQuantity.setText("");
             spinnerIngredientUnit.setSelection(0);
@@ -125,10 +146,10 @@ public class AddIngredientActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
-        super.onDestroy();
-
         if (databaseHelper != null) {
             databaseHelper.close();
         }
+
+        super.onDestroy();
     }
 }
