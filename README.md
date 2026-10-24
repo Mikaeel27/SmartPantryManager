@@ -1,3 +1,4 @@
+### Smart Pantry Manager
 ## Project Description
 Smart Pantry Manager is an Android application developed using Java and XML in Android Studio. It allows users to manage pantry ingredients and find recipes based on available ingredients and quantities.
 
